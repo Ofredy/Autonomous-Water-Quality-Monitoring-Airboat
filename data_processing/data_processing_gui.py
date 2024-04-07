@@ -1,70 +1,102 @@
-# System imports
 import os
 import glob
 
 # Libary imports
 import streamlit as st
-
+import pandas as pd
+import pydeck as pdk
 # Our imports
+from loclal_pydeck import *
+from local_outlier import *
 
 
 # System constants
 graphs = ['gps_graph', 'time_vs_anomaly_score', 'time_vs_ph', 'time_vs_turbidity', 'time_vs_temp', 'time_vs_tds']
-
-
 class DataProcessingGUI:
-
     def __init__(self):
-    
         self.graph_objs = {}
         self.graphs_generated = False
+        self.uploaded_file = None
+
+    @staticmethod
+    def compute_color(anomaly_score):
+        if anomaly_score > 0.5:
+            return [255, 0, 0, 160]  # Red color for higher anomaly scores
+        else:
+            return [0, 0, 255, 160]  # Blue color for lower anomaly scores
+
+    def _perform_anomaly_detection(self, df):
+        dt['Anomaly_Score'] = dt[['PH_Score', 'Temp_Score', 'TDS_Score', 'Turbidity_Score']].mean(axis=1)
+        df['color'] = dt['Anomaly_Score'].apply(self.compute_color)
+        return df
 
     def _generate_graphs(self):
-        
-        if len(self.data_csv) == 0:
+        if self.uploaded_file is None:
             return
 
-        ############## GUI CODE NEEDS TO CONNECT TO ANOMALY DETECTION & PLOTTING HERE TO PLOT ##############
+        # Load the uploaded CSV file into a DataFrame
+        df = pd.read_csv(self.uploaded_file)
+        df = self._perform_anomaly_detection(df)
+        
+        
 
+    
 
+           # Create a pydeck layer for the data
+        scatterplot_layer = pdk.Layer(
+        'ColumnLayer',
+        df,
+        get_position=['Longitude', 'Latitude'],
+        get_color='color',
+        auto_highlight=True,
+        elevation_scale=50,
+        pickable=True,
+        elevation_range=[0, 3000],
+        extruded=True,                 
+        coverage=1  # Adjust multiplier as needed to visualize anomaly score elevation
+        )      
+
+            # Adjust latitude, longitude, and zoom according to your data's location
+        INITIAL_VIEW_STATE = pdk.ViewState(
+        latitude=df["Latitude"].mean(),
+        longitude=df["Longitude"].mean(),
+        zoom=5,
+        min_zoom=5,
+        max_zoom=15,
+        pitch=40.5,
+        bearing=-27.36)
+
+        # Create the deck
+        deck = pdk.Deck(
+        layers=[scatterplot_layer],
+        initial_view_state=INITIAL_VIEW_STATE,
+        )
+        
+        self.graph_objs['3D Anomaly Visualization'] = deck
         self.graphs_generated = True
 
     def _display_graph(self):
-
-        if len(self.selected_graph) == 0:
+        if not self.graphs_generated:
             return
-        
-        for idx, graph in enumerate(graphs):
 
-            if graph in self.graph_objs.keys() and idx == 0:
-
-                gps_graph_label = f"<p style='font-family:sans-serif; font-size: 20px; text-align:center;'>{graph}</p>"
-                st.markdown(gps_graph_label, unsafe_allow_html=True)
-                st.pydeck_chart(self.graph_objs[graph])
-            
-            elif graph in self.graph_objs.keys():
-
-                graph_label = f"<p style='font-family:sans-serif; font-size: 20px; text-align:center;'>{graph}</p>"
-                st.markdown(graph_label, unsafe_allow_html=True)
-                st.pyplot(self.graph_objs[graph])
+        for graph_name, graph_obj in self.graph_objs.items():
+            st.markdown(f"<p style='font-family:sans-serif; font-size: 20px; text-align:center;'>{graph_name}</p>", unsafe_allow_html=True)
+            st.pydeck_chart(graph_obj)
 
     def window(self):
-        
         st.set_page_config(page_title="Airboat PMDT")
 
         with st.container():
-            
-            title = '<p style="font-family:sans-serif; font-size: 36px;">Airboat Post Mission Data Processing Tool</p>'
-            st.markdown(title, unsafe_allow_html=True)
+            st.markdown('<p style="font-family:sans-serif; font-size: 36px;">Airboat Post Mission Data Processing Tool</p>', unsafe_allow_html=True)
 
-            self.data_csv = st.multiselect("Select a data csv file to visualize", glob.glob(os.path.join('data', '*.csv')), max_selections=1)
+            # File uploader widget
+            self.uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
 
-            self._generate_graphs()
+            if self.uploaded_file is not None:
+                self._generate_graphs()
 
         with st.container():
-
             if self.graphs_generated:
-
-                self.selected_graph = st.multiselect("Select graphs to inspect", graphs)
-
                 self._display_graph()
+
+
