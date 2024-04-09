@@ -12,6 +12,15 @@ from local_outlier import *
 
 # System constants
 graphs = ['gps_graph', 'time_vs_anomaly_score', 'time_vs_ph', 'time_vs_turbidity', 'time_vs_temp', 'time_vs_tds']
+data = {
+    'Time': time,
+    'GPS_Latitude': gps_lat,
+    'GPS_Longitude': gps_long,
+    'PH': ph,
+    'Turbidity': turbidity,
+    'Temperature': temp,
+    'TDS': tds,
+}
 class DataProcessingGUI:
     def __init__(self):
         self.graph_objs = {}
@@ -36,9 +45,23 @@ class DataProcessingGUI:
 
         # Load the uploaded CSV file into a DataFrame
         df = pd.read_csv(self.uploaded_file)
+      
         df = self._perform_anomaly_detection(df)
         
-        
+        # Define tooltip for hovering
+        tooltip = {
+            "html": "<b>Time:</b> {Time}<br>" +
+                    "<b>Longitude:</b> {Longitude}<br>" +
+                    "<b>Latitude:</b> {Latitude}<br>" +
+                    "<b>PH:</b> {PH}<br>" +
+                    "<b>Temperature:</b> {Temperature}<br>" +
+                    "<b>TDS Score:</b> {TDS}<br>" +
+                    "<b>Turbidity:</b> {Turbidity}",
+            "style": {
+                "backgroundColor": "steelblue",
+                "color": "white"
+            }
+        }
 
     
 
@@ -50,11 +73,26 @@ class DataProcessingGUI:
         get_color='color',
         auto_highlight=True,
         elevation_scale=50,
+        get_radius = 200,
+        pickable=True,
+        elevation_range=[0, 3000],
+        extruded=True,                 
+        coverage=4  # Adjust multiplier as needed to visualize anomaly score elevation
+        )
+
+        invisible_layer = pdk.Layer(
+        'ColumnLayer',
+        df,
+        get_position=['Longitude', 'Latitude'],
+        get_color=[0,0,0,0],
+        auto_highlight=True,
+        elevation_scale=50,
+        get_radius = 300,
         pickable=True,
         elevation_range=[0, 3000],
         extruded=True,                 
         coverage=1  # Adjust multiplier as needed to visualize anomaly score elevation
-        )      
+        )
 
             # Adjust latitude, longitude, and zoom according to your data's location
         INITIAL_VIEW_STATE = pdk.ViewState(
@@ -68,8 +106,10 @@ class DataProcessingGUI:
 
         # Create the deck
         deck = pdk.Deck(
-        layers=[scatterplot_layer],
+        layers=[invisible_layer,scatterplot_layer],
         initial_view_state=INITIAL_VIEW_STATE,
+        tooltip=tooltip,
+        map_style="mapbox://styles/mapbox/light-v9",
         )
         
         self.graph_objs['3D Anomaly Visualization'] = deck
