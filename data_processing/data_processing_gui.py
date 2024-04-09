@@ -5,6 +5,9 @@ import glob
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import matplotlib.pyplot as plt 
+from matplotlib.legend_handler import HandlerPathCollection
+
 # Our imports
 from loclal_pydeck import *
 from local_outlier import *
@@ -21,6 +24,40 @@ data = {
     'Temperature': temp,
     'TDS': tds,
 }
+# Set 'Time' as the index
+data.set_index('Time', inplace=True)
+
+# Plotting
+fig, axs = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+
+axs[0].plot(data.index, data['PH'], label='pH', color='blue')
+axs[0].set_ylabel('pH')
+axs[0].set_xlabel('Time (Seconds)')
+axs[0].legend(loc='upper right')
+
+axs[1].plot(data.index, data['Temperature'], label='Temperature (°C)', color='red')
+axs[1].set_ylabel('Temp (°C)')
+axs[1].set_xlabel('Time (Seconds)')
+axs[1].legend(loc='upper right')
+
+axs[2].plot(data.index, data['TDS'], label='TDS (mg/L)', color='green')
+axs[2].set_ylabel('TDS (mg/L)')
+axs[2].set_xlabel('Time (Seconds)')
+axs[2].legend(loc='upper right')
+
+axs[3].plot(data.index, data['Turbidity'], label='Turbidity (NTU)', color='purple')
+axs[3].set_ylabel('Turbidity (NTU)')
+axs[3].set_xlabel('Time (Seconds)')
+axs[3].legend(loc='upper right')
+
+for ax in axs:
+    ax.tick_params(axis='x', labelbottom=True)  # Turn on the visibility of the x-axis labelsS
+
+# Improve spacing and layout
+plt.tight_layout()
+
+# Show plot
+plt.show()
 class DataProcessingGUI:
     def __init__(self):
         self.graph_objs = {}
