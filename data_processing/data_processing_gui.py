@@ -1,70 +1,179 @@
-# System imports
 import os
 import glob
 
 # Libary imports
 import streamlit as st
+import pandas as pd
+import pydeck as pdk
+import matplotlib.pyplot as plt 
+from matplotlib.legend_handler import HandlerPathCollection
 
 # Our imports
+from loclal_pydeck import *
+from local_outlier import *
 
 
 # System constants
 graphs = ['gps_graph', 'time_vs_anomaly_score', 'time_vs_ph', 'time_vs_turbidity', 'time_vs_temp', 'time_vs_tds']
+data = {
+    'Time': time,
+    'GPS_Latitude': gps_lat,
+    'GPS_Longitude': gps_long,
+    'PH': ph,
+    'Turbidity': turbidity,
+    'Temperature': temp,
+    'TDS': tds,
+}
+# Set 'Time' as the index
+data.set_index('Time', inplace=True)
 
+# Plotting
+fig, axs = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
 
+axs[0].plot(data.index, data['PH'], label='pH', color='blue')
+axs[0].set_ylabel('pH')
+axs[0].set_xlabel('Time (Seconds)')
+axs[0].legend(loc='upper right')
+
+axs[1].plot(data.index, data['Temperature'], label='Temperature (°C)', color='red')
+axs[1].set_ylabel('Temp (°C)')
+axs[1].set_xlabel('Time (Seconds)')
+axs[1].legend(loc='upper right')
+
+axs[2].plot(data.index, data['TDS'], label='TDS (mg/L)', color='green')
+axs[2].set_ylabel('TDS (mg/L)')
+axs[2].set_xlabel('Time (Seconds)')
+axs[2].legend(loc='upper right')
+
+axs[3].plot(data.index, data['Turbidity'], label='Turbidity (NTU)', color='purple')
+axs[3].set_ylabel('Turbidity (NTU)')
+axs[3].set_xlabel('Time (Seconds)')
+axs[3].legend(loc='upper right')
+
+for ax in axs:
+    ax.tick_params(axis='x', labelbottom=True)  # Turn on the visibility of the x-axis labelsS
+
+# Improve spacing and layout
+plt.tight_layout()
+
+# Show plot
+plt.show()
 class DataProcessingGUI:
-
     def __init__(self):
-    
         self.graph_objs = {}
         self.graphs_generated = False
+        self.uploaded_file = None
+
+    @staticmethod
+    def compute_color(anomaly_score):
+        if anomaly_score > 0.5:
+            return [255, 0, 0, 160]  # Red color for higher anomaly scores
+        else:
+            return [0, 0, 255, 160]  # Blue color for lower anomaly scores
+
+    def _perform_anomaly_detection(self, df):
+        dt['Anomaly_Score'] = dt[['PH_Score', 'Temp_Score', 'TDS_Score', 'Turbidity_Score']].mean(axis=1)
+        df['color'] = dt['Anomaly_Score'].apply(self.compute_color)
+        return df
 
     def _generate_graphs(self):
-        
-        if len(self.data_csv) == 0:
+        if self.uploaded_file is None:
             return
 
-        ############## GUI CODE NEEDS TO CONNECT TO ANOMALY DETECTION & PLOTTING HERE TO PLOT ##############
+        # Load the uploaded CSV file into a DataFrame
+        df = pd.read_csv(self.uploaded_file)
+      
+        df = self._perform_anomaly_detection(df)
+        
+        # Define tooltip for hovering
+        tooltip = {
+            "html": "<b>Time:</b> {Time}<br>" +
+                    "<b>Longitude:</b> {Longitude}<br>" +
+                    "<b>Latitude:</b> {Latitude}<br>" +
+                    "<b>PH:</b> {PH}<br>" +
+                    "<b>Temperature:</b> {Temperature}<br>" +
+                    "<b>TDS Score:</b> {TDS}<br>" +
+                    "<b>Turbidity:</b> {Turbidity}",
+            "style": {
+                "backgroundColor": "steelblue",
+                "color": "white"
+            }
+        }
 
+    
 
+           # Create a pydeck layer for the data
+        scatterplot_layer = pdk.Layer(
+        'ColumnLayer',
+        df,
+        get_position=['Longitude', 'Latitude'],
+        get_color='color',
+        auto_highlight=True,
+        elevation_scale=50,
+        get_radius = 200,
+        pickable=True,
+        elevation_range=[0, 3000],
+        extruded=True,                 
+        coverage=4  # Adjust multiplier as needed to visualize anomaly score elevation
+        )
+
+        invisible_layer = pdk.Layer(
+        'ColumnLayer',
+        df,
+        get_position=['Longitude', 'Latitude'],
+        get_color=[0,0,0,0],
+        auto_highlight=True,
+        elevation_scale=50,
+        get_radius = 300,
+        pickable=True,
+        elevation_range=[0, 3000],
+        extruded=True,                 
+        coverage=1  # Adjust multiplier as needed to visualize anomaly score elevation
+        )
+
+            # Adjust latitude, longitude, and zoom according to your data's location
+        INITIAL_VIEW_STATE = pdk.ViewState(
+        latitude=df["Latitude"].mean(),
+        longitude=df["Longitude"].mean(),
+        zoom=5,
+        min_zoom=5,
+        max_zoom=15,
+        pitch=40.5,
+        bearing=-27.36)
+
+        # Create the deck
+        deck = pdk.Deck(
+        layers=[invisible_layer,scatterplot_layer],
+        initial_view_state=INITIAL_VIEW_STATE,
+        tooltip=tooltip,
+        map_style="mapbox://styles/mapbox/light-v9",
+        )
+        
+        self.graph_objs['3D Anomaly Visualization'] = deck
         self.graphs_generated = True
 
     def _display_graph(self):
-
-        if len(self.selected_graph) == 0:
+        if not self.graphs_generated:
             return
-        
-        for idx, graph in enumerate(graphs):
 
-            if graph in self.graph_objs.keys() and idx == 0:
-
-                gps_graph_label = f"<p style='font-family:sans-serif; font-size: 20px; text-align:center;'>{graph}</p>"
-                st.markdown(gps_graph_label, unsafe_allow_html=True)
-                st.pydeck_chart(self.graph_objs[graph])
-            
-            elif graph in self.graph_objs.keys():
-
-                graph_label = f"<p style='font-family:sans-serif; font-size: 20px; text-align:center;'>{graph}</p>"
-                st.markdown(graph_label, unsafe_allow_html=True)
-                st.pyplot(self.graph_objs[graph])
+        for graph_name, graph_obj in self.graph_objs.items():
+            st.markdown(f"<p style='font-family:sans-serif; font-size: 20px; text-align:center;'>{graph_name}</p>", unsafe_allow_html=True)
+            st.pydeck_chart(graph_obj)
 
     def window(self):
-        
         st.set_page_config(page_title="Airboat PMDT")
 
         with st.container():
-            
-            title = '<p style="font-family:sans-serif; font-size: 36px;">Airboat Post Mission Data Processing Tool</p>'
-            st.markdown(title, unsafe_allow_html=True)
+            st.markdown('<p style="font-family:sans-serif; font-size: 36px;">Airboat Post Mission Data Processing Tool</p>', unsafe_allow_html=True)
 
-            self.data_csv = st.multiselect("Select a data csv file to visualize", glob.glob(os.path.join('data', '*.csv')), max_selections=1)
+            # File uploader widget
+            self.uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
 
-            self._generate_graphs()
+            if self.uploaded_file is not None:
+                self._generate_graphs()
 
         with st.container():
-
             if self.graphs_generated:
-
-                self.selected_graph = st.multiselect("Select graphs to inspect", graphs)
-
                 self._display_graph()
+
+
