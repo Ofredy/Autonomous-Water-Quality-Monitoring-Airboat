@@ -42,13 +42,6 @@ class DataProcessingGUI:
         
         deck = plot_data(df)  
 
-        
-        
-
-    
-
-           
-        
         self.graph_objs['3D Anomaly Visualization'] = deck
         self.graphs_generated = True
 
@@ -75,5 +68,3 @@ class DataProcessingGUI:
         with st.container():
             if self.graphs_generated:
                 self._display_graph()
-
-

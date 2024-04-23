@@ -36,8 +36,8 @@ def anomaly_detections(df):
 
 
 
-# Normalize negative outlier factor scores for color mapping
-# Invert scores to positive, as more negative implies more of an outlier
+    # Normalize negative outlier factor scores for color mapping
+    # Invert scores to positive, as more negative implies more of an outlier
     df['norm_ph_scores'] = (df['ph_scores'] - df['ph_scores'].min()) / (df['ph_scores'].max() - df['ph_scores'].min())
     df['norm_temp_scores'] = (df['temp_scores'] - df['temp_scores'].min()) / (df['temp_scores'].max() - df['temp_scores'].min())
     df['norm_tds_scores'] = (df['tds_scores'] - df['tds_scores'].min()) / (df['tds_scores'].max() - df['tds_scores'].min())
@@ -49,9 +49,3 @@ def anomaly_detections(df):
     df['tds_anomaly_flag'] = df['norm_tds_scores'].apply(lambda x: 1 if x > anomaly_threshold else 0)
     df['turbidity_anomaly_flag'] = df['norm_turbidity_scores'].apply(lambda x: 1 if x > anomaly_threshold else 0)
     return df
-
-
-
-
-
-
