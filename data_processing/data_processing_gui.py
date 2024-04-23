@@ -5,149 +5,49 @@ import glob
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import numpy as np
 import matplotlib.pyplot as plt 
 from matplotlib.legend_handler import HandlerPathCollection
 
 # Our imports
-from loclal_pydeck import *
-from local_outlier import *
+from plotting import *
+from anomaly_detection import *
 
 
 # System constants
 graphs = ['gps_graph', 'time_vs_anomaly_score', 'time_vs_ph', 'time_vs_turbidity', 'time_vs_temp', 'time_vs_tds']
-data = {
-    'Time': time,
-    'GPS_Latitude': gps_lat,
-    'GPS_Longitude': gps_long,
-    'PH': ph,
-    'Turbidity': turbidity,
-    'Temperature': temp,
-    'TDS': tds,
+normal_ranges = {
+    'PH': (5, 8.5),
+    'Temperature': (65, 75),
+    'TDS': (150, 300),
+    'Turbidity': (0, 10),
 }
-# Set 'Time' as the index
-data.set_index('Time', inplace=True)
 
-# Plotting
-fig, axs = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
-
-axs[0].plot(data.index, data['PH'], label='pH', color='blue')
-axs[0].set_ylabel('pH')
-axs[0].set_xlabel('Time (Seconds)')
-axs[0].legend(loc='upper right')
-
-axs[1].plot(data.index, data['Temperature'], label='Temperature (°C)', color='red')
-axs[1].set_ylabel('Temp (°C)')
-axs[1].set_xlabel('Time (Seconds)')
-axs[1].legend(loc='upper right')
-
-axs[2].plot(data.index, data['TDS'], label='TDS (mg/L)', color='green')
-axs[2].set_ylabel('TDS (mg/L)')
-axs[2].set_xlabel('Time (Seconds)')
-axs[2].legend(loc='upper right')
-
-axs[3].plot(data.index, data['Turbidity'], label='Turbidity (NTU)', color='purple')
-axs[3].set_ylabel('Turbidity (NTU)')
-axs[3].set_xlabel('Time (Seconds)')
-axs[3].legend(loc='upper right')
-
-for ax in axs:
-    ax.tick_params(axis='x', labelbottom=True)  # Turn on the visibility of the x-axis labelsS
-
-# Improve spacing and layout
-plt.tight_layout()
-
-# Show plot
-plt.show()
 class DataProcessingGUI:
     def __init__(self):
         self.graph_objs = {}
         self.graphs_generated = False
         self.uploaded_file = None
 
-    @staticmethod
-    def compute_color(anomaly_score):
-        if anomaly_score > 0.5:
-            return [255, 0, 0, 160]  # Red color for higher anomaly scores
-        else:
-            return [0, 0, 255, 160]  # Blue color for lower anomaly scores
-
-    def _perform_anomaly_detection(self, df):
-        dt['Anomaly_Score'] = dt[['PH_Score', 'Temp_Score', 'TDS_Score', 'Turbidity_Score']].mean(axis=1)
-        df['color'] = dt['Anomaly_Score'].apply(self.compute_color)
-        return df
 
     def _generate_graphs(self):
         if self.uploaded_file is None:
             return
 
-        # Load the uploaded CSV file into a DataFrame
-        df = pd.read_csv(self.uploaded_file)
-      
-        df = self._perform_anomaly_detection(df)
         
-        # Define tooltip for hovering
-        tooltip = {
-            "html": "<b>Time:</b> {Time}<br>" +
-                    "<b>Longitude:</b> {Longitude}<br>" +
-                    "<b>Latitude:</b> {Latitude}<br>" +
-                    "<b>PH:</b> {PH}<br>" +
-                    "<b>Temperature:</b> {Temperature}<br>" +
-                    "<b>TDS Score:</b> {TDS}<br>" +
-                    "<b>Turbidity:</b> {Turbidity}",
-            "style": {
-                "backgroundColor": "steelblue",
-                "color": "white"
-            }
-        }
+        # Convert the uploaded file to a DataFrame
+        df = pd.read_csv(self.uploaded_file)
+
+        # Apply anomaly detection and plotting
+        
+        deck = plot_data(df)  
+
+        
+        
 
     
 
-           # Create a pydeck layer for the data
-        scatterplot_layer = pdk.Layer(
-        'ColumnLayer',
-        df,
-        get_position=['Longitude', 'Latitude'],
-        get_color='color',
-        auto_highlight=True,
-        elevation_scale=50,
-        get_radius = 200,
-        pickable=True,
-        elevation_range=[0, 3000],
-        extruded=True,                 
-        coverage=4  # Adjust multiplier as needed to visualize anomaly score elevation
-        )
-
-        invisible_layer = pdk.Layer(
-        'ColumnLayer',
-        df,
-        get_position=['Longitude', 'Latitude'],
-        get_color=[0,0,0,0],
-        auto_highlight=True,
-        elevation_scale=50,
-        get_radius = 300,
-        pickable=True,
-        elevation_range=[0, 3000],
-        extruded=True,                 
-        coverage=1  # Adjust multiplier as needed to visualize anomaly score elevation
-        )
-
-            # Adjust latitude, longitude, and zoom according to your data's location
-        INITIAL_VIEW_STATE = pdk.ViewState(
-        latitude=df["Latitude"].mean(),
-        longitude=df["Longitude"].mean(),
-        zoom=5,
-        min_zoom=5,
-        max_zoom=15,
-        pitch=40.5,
-        bearing=-27.36)
-
-        # Create the deck
-        deck = pdk.Deck(
-        layers=[invisible_layer,scatterplot_layer],
-        initial_view_state=INITIAL_VIEW_STATE,
-        tooltip=tooltip,
-        map_style="mapbox://styles/mapbox/light-v9",
-        )
+           
         
         self.graph_objs['3D Anomaly Visualization'] = deck
         self.graphs_generated = True

@@ -2,53 +2,88 @@ import pydeck as pdk
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import LocalOutlierFactor
-from fake_data import *
-from local_outlier import *
+from anomaly_detection import *
 import matplotlib.pyplot as plt 
 from matplotlib.legend_handler import HandlerPathCollection
-
-
-# Assuming gps_long, gps_lat, norm_ph_scores, norm_temp_scores, norm_tds_scores, norm_turbidity_scores are defined as in your code
-
-# Combine GPS coordinates and normalized scores into a single DataFrame
-data = {
-    'Longitude': gps_long,
-    'Latitude': gps_lat,
-    'PH_Score': norm_ph_scores,
-    'Temp_Score': norm_temp_scores,
-    'TDS_Score': norm_tds_scores,
-    'Turbidity_Score': norm_turbidity_scores,
+normal_ranges = {
+    'PH': (5, 8.5),
+    'Temperature': (65, 75),
+    'TDS': (150, 300),
+    'Turbidity': (0, 10),
 }
+feature_columns = ['PH', 'Temperature', 'TDS', 'Turbidity']
 
-df = pd.DataFrame(data)
-df['Anomaly_Score'] = df[['PH_Score', 'Temp_Score', 'TDS_Score', 'Turbidity_Score']].mean(axis=1)
 ## Example adjustment for color computation
-def compute_color(anomaly_score):
-    if anomaly_score > 0.5:
-        return [255, 0, 0, 160]  # Red color for higher anomaly scores
+def compute_color(row):
+    # Check individual anomaly flags for sensors. If any flag is set, color the point as an anomaly.
+    if row['ph_anomaly_flag'] == 1 or row['temp_anomaly_flag'] == 1 or \
+       row['tds_anomaly_flag'] == 1 or row['turbidity_anomaly_flag'] == 1:
+        return [255, 0, 0, 160]  # Red for any sensor anomaly
     else:
-        return [0, 0, 255, 160]  # Blue color for lower anomaly scores
+        return [0, 0, 255, 160]  # Blue for normal
 
-# Apply the function to the 'Anomaly_Score' column to create the 'color' column
-df['color'] = df['Anomaly_Score'].apply(compute_color)
+def plot_data(df):
+    
+
+    
+    # Perform anomaly detection on the sensor columns
+    df = anomaly_detections(df)
+
+    df['Anomaly_Score'] = df[['norm_ph_scores', 'norm_temp_scores', 'norm_tds_scores', 'norm_turbidity_scores']].mean(axis=1)
+
+    # Apply the function to the 'Anomaly_Score' column to create the 'color' column
+    df['color'] = df.apply(compute_color, axis=1)
+    
 
 
-# Create a pydeck layer for the data
-scatterplot_layer = pdk.Layer(
+    tooltip = {
+            "html": "<b>Time:</b> {Time}<br>" +
+                    "<b>Longitude:</b> {Longitude}<br>" +
+                    "<b>Latitude:</b> {Latitude}<br>" +
+                    "<b>PH:</b> {PH}<br>" +
+                    "<b>PH_Flag:</b> {ph_anomaly_flag}<br>" +
+                    "<b>Temperature:</b> {Temperature}<br>" +
+                    "<b>Temp_Flag:</b> {temp_anomaly_flag}<br>" +
+                    "<b>TDS:</b> {TDS}<br>" +
+                    "<b>TDS_Flag:</b> {tds_anomaly_flag}<br>" +
+                    "<b>Turbidity:</b> {Turbidity}<br>"+
+                    "<b>Turbidity_Flag:</b> {turbidity_anomaly_flag}<br>",
+            "style": {
+                "backgroundColor": "steelblue",
+                "color": "white"
+            }
+        }
+    # Create a pydeck layer for the data
+    scatterplot_layer = pdk.Layer(
     'ColumnLayer',
     df,
     get_position=['Longitude', 'Latitude'],
     get_color='color',
     auto_highlight=True,
     elevation_scale=50,
+    get_radius = 200,
+    pickable=True,
+    elevation_range=[0, 3000],
+    extruded=True,                 
+    coverage=4  # Adjust multiplier as needed to visualize anomaly score elevation
+    )
+
+    invisible_layer = pdk.Layer(
+    'ColumnLayer',
+    df,
+    get_position=['Longitude', 'Latitude'],
+    get_color=[0,0,0,0],
+    auto_highlight=True,
+    elevation_scale=50,
+    get_radius = 300,
     pickable=True,
     elevation_range=[0, 3000],
     extruded=True,                 
     coverage=1  # Adjust multiplier as needed to visualize anomaly score elevation
-)
+    )
 
-# Adjust latitude, longitude, and zoom according to data's location
-INITIAL_VIEW_STATE = pdk.ViewState(
+    # Adjust latitude, longitude, and zoom according to your data's location
+    INITIAL_VIEW_STATE = pdk.ViewState(
     latitude=df["Latitude"].mean(),
     longitude=df["Longitude"].mean(),
     zoom=5,
@@ -56,11 +91,16 @@ INITIAL_VIEW_STATE = pdk.ViewState(
     max_zoom=15,
     pitch=40.5,
     bearing=-27.36)
-# Create the deck
-deck = pdk.Deck(
-    layers=[scatterplot_layer],
-    initial_view_state=INITIAL_VIEW_STATE,
-)
 
-# To display the visualization outside of a Jupyter notebook, save it as an HTML file
-deck.to_html('water_quality_anomalies.html', open_browser=True)
+    # Create the deck
+    deck = pdk.Deck(
+    layers=[invisible_layer,scatterplot_layer],
+    initial_view_state=INITIAL_VIEW_STATE,
+    tooltip=tooltip,
+     )
+    return deck
+    #deck.to_html('water_quality_anomalies.html', open_browser=True)
+
+#file_path = 'water_quality_data.csv'
+#plot_data(file_path)
+
