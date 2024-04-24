@@ -16,8 +16,8 @@ feature_columns = ['PH', 'Temperature', 'TDS', 'Turbidity']
 ## Example adjustment for color computation
 def compute_color(row):
     # Check individual anomaly flags for sensors. If any flag is set, color the point as an anomaly.
-    if row['ph_anomaly_flag'] == 1 or row['temp_anomaly_flag'] == 1 or \
-       row['tds_anomaly_flag'] == 1 or row['turbidity_anomaly_flag'] == 1:
+    if row['ph_anomaly'] == 1 or row['temp_anomaly'] == 1 or \
+       row['tds_anomaly'] == 1 or row['turbidity_anomaly'] == 1:
         return [255, 0, 0, 160]  # Red for any sensor anomaly
     else:
         return [0, 0, 255, 160]  # Blue for normal
@@ -103,8 +103,5 @@ def plot_data(df):
     tooltip=tooltip,
      )
     return deck
-    #deck.to_html('water_quality_anomalies.html', open_browser=True)
-
-#file_path = 'water_quality_data.csv'
-#plot_data(file_path)
+    
 
