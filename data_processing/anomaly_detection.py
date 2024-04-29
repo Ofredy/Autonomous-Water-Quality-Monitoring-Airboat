@@ -1,46 +1,43 @@
 import numpy as np
-from sklearn.neighbors import LocalOutlierFactor
+
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 
+from sklearn.ensemble import IsolationForest
+
 def anomaly_detections(df):
+    
     feature_columns = ['PH', 'Turbidity', 'Temperature', 'TDS']
+    # Create Isolation Forest models for each feature column
+    iso_forest_ph = IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.01),max_features=1.0)
+    iso_forest_turbidity = IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.01),max_features=1.0)
+    iso_forest_temperature = IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.01),max_features=1.0)
+    iso_forest_tds = IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.01),max_features=1.0)
     
-
-
-    # Set LOF parameters
-    contamination = 0.01  # Lowered to reduce sensitivity
-    n_neighbors = 20      # Increased to smooth anomaly detection
-    anomaly_threshold = 0.998  # Higher threshold for anomaly flagging
+    # Fit the models and predict anomalies
+    iso_forest_ph.fit(df[['PH']])
+    iso_forest_turbidity.fit(df[['Turbidity']])
+    iso_forest_temperature.fit(df[['Temperature']])
+    iso_forest_tds.fit(df[['TDS']])
     
-    # Apply LOF for each feature separately
-    clf_ph = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
-    clf_turbidity = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
-    clf_temperature = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
-    clf_tds = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
+    # Calculate the anomaly scores (the lower, the more abnormal)
+    df['ph_scores'] = iso_forest_ph.decision_function(df[['PH']])
+    df['turbidity_scores'] = iso_forest_turbidity.decision_function(df[['Turbidity']])
+    df['temperature_scores'] = iso_forest_temperature.decision_function(df[['Temperature']])
+    df['tds_scores'] = iso_forest_tds.decision_function(df[['TDS']])
     
-    # Perform anomaly detection
-    df['ph_pred'] = clf_ph.fit_predict(df[['PH']])
-    df['turbidity_pred'] = clf_turbidity.fit_predict(df[['Turbidity']])
-    df['temp_pred'] = clf_temperature.fit_predict(df[['Temperature']])
-    df['tds_pred'] = clf_tds.fit_predict(df[['TDS']])
+    #predict the anomaly
+    df['ph_anomaly'] = iso_forest_ph.predict(df[['PH']])
+    df['turbidity_anomaly'] = iso_forest_turbidity.predict(df[['Turbidity']])
+    df['temp_anomaly'] = iso_forest_temperature.predict(df[['Temperature']])
+    df['tds_anomaly'] = iso_forest_tds.predict(df[['TDS']])
     
-    # Calculate negative outlier factor scores
-    df['ph_scores'] = clf_ph.negative_outlier_factor_
-    df['turbidity_scores'] = clf_turbidity.negative_outlier_factor_
-    df['temp_scores'] = clf_temperature.negative_outlier_factor_
-    df['tds_scores'] = clf_tds.negative_outlier_factor_
-
-    # Normalize negative outlier factor scores for color mapping
-    # Invert scores to positive, as more negative implies more of an outlier
-    df['norm_ph_scores'] = (df['ph_scores'] - df['ph_scores'].min()) / (df['ph_scores'].max() - df['ph_scores'].min())
-    df['norm_turbidity_scores'] = (df['turbidity_scores'] - df['turbidity_scores'].min()) / (df['turbidity_scores'].max() - df['turbidity_scores'].min())
-    df['norm_temp_scores'] = (df['temp_scores'] - df['temp_scores'].min()) / (df['temp_scores'].max() - df['temp_scores'].min())
-    df['norm_tds_scores'] = (df['tds_scores'] - df['tds_scores'].min()) / (df['tds_scores'].max() - df['tds_scores'].min())
+   
+    # Change labels from -1, 1 to 1, 0
+    #Easier to understand for user
+    anomaly_columns = ['ph_anomaly', 'turbidity_anomaly', 'temp_anomaly', 'tds_anomaly']
+    for col in anomaly_columns:
+        df[col] = df[col].apply(lambda x: 1 if x == -1 else 0)
     
-    df['ph_anomaly_flag'] = df['norm_ph_scores'].apply(lambda x: 1 if x > anomaly_threshold else 0)
-    df['turbidity_anomaly_flag'] = df['norm_turbidity_scores'].apply(lambda x: 1 if x > anomaly_threshold else 0)
-    df['temp_anomaly_flag'] = df['norm_temp_scores'].apply(lambda x: 1 if x > anomaly_threshold else 0)
-    df['tds_anomaly_flag'] = df['norm_tds_scores'].apply(lambda x: 1 if x > anomaly_threshold else 0)
-
     return df
+
