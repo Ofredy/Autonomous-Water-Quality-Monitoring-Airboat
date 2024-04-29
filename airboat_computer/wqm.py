@@ -1,6 +1,12 @@
 # System imports
+import os
 import socket
+import threading
 import time
+
+# Library imports
+import pigpio
+
 
 ########### Socket Server Configs ###########
 # SERVER_IP = '172.20.10.4'
@@ -15,6 +21,14 @@ SLEEP_TIME_TO_READ_DATA = 5
 
 ########### WQM DESCENT CONFIGS ###########
 WQM_DESCENT_TIME = 8000 # ms
+MOTOR_PIN = 17
+DESCENT_DUTY_CYCLE = 13
+STOP_DUTY_CYCLE = 19.125
+ASCENT_DUTY_CYCLE = 25
+MAX_DESCENT_TIME = 20 # s
+MAX_ASCENT_TIME = 20  # s
+TENSION_PIN = 27
+ASCENT_COMPLETE_PIN = 22
 
 ########### data selection idx Configs ###########
 DELTA_T = 80 # ms
@@ -38,7 +52,7 @@ def parse_data(data_buffer):
 
 class WQM:
 	
-	def __init__(self, server_ip, server_port, output_file):
+	def __init__(self, server_ip=SERVER_IP, server_port=SERVER_PORT, output_file=OUTPUT_FILE):
 		
 		self.server_ip = server_ip
 		self.server_port = server_port
@@ -47,6 +61,51 @@ class WQM:
 		self.dataIndex1, self.dataIndex2 = -1, -1
 		self.SCC_received, self.DC_ongoing, self.ET_received, self.D_received = False, False, False, False
 		self.DCP_completed = False
+
+		# Initializing gpio
+		self._gpio_init()
+
+		# Creating the motor_control_thread 
+		self.motor_control_thread = threading.Thread(target=self._wqm_motor_control, daemon=True)
+
+	def _gpio_init(self):
+
+		os.system("sudo pigpiod")
+		time.sleep(0.5)
+
+		self.gpio = pigpio.pi()
+
+		self.gpio.set_mode(MOTOR_PIN, pigpio.OUTPUT)
+		self.gpio.set_PWM_frequency(MOTOR_PIN, 50)
+
+		self.gpio.set_mode(TENSION_PIN, pigpio.INPUT)
+		self.gpio.set_pull_up_down(TENSION_PIN, pigpio.PUD_DOWN)
+
+		self.gpio.set_mode(ASCENT_COMPLETE_PIN, pigpio.INPUT)
+		self.gpio.set_pull_up_down(ASCENT_COMPLETE_PIN, pigpio.PUD_DOWN)
+
+	def _wqm_motor_control(self):
+
+		# Starting WQM Descent
+		self.gpio.set_PWM_dutycycle(MOTOR_PIN, DESCENT_DUTY_CYCLE)
+		descent_start_time = time.time()
+		descent_time = time.time() - descent_start_time
+
+		while self.gpio.read(TENSION_PIN) == 0 and descent_time < MAX_DESCENT_TIME:
+			descent_time = time.time() - descent_start_time
+			time.sleep(0.001)
+
+		# Starting WQM Ascent
+		self.gpio.set_PWM_dutycycle(MOTOR_PIN, ASCENT_DUTY_CYCLE)
+		ascent_start_time = time.time()
+		ascent_time = time.time() - ascent_start_time
+	
+		while self.gpio.read(ASCENT_COMPLETE_PIN) == 0 and ascent_time < MAX_ASCENT_TIME:
+			ascent_time = time.time() - ascent_start_time
+			time.sleep(0.001)
+
+		# WQM deployment complete
+		self.gpio.set_PWM_dutycycle(MOTOR_PIN, STOP_DUTY_CYCLE)
 
 	def _connect_to_wqm(self):
 
@@ -217,20 +276,45 @@ class WQM:
 
 	def deploy(self):
 
-		while not self._get_DCP_completed():
+		try:
 
-			if self._get_state() == 0:
-				
-				print("Not connected to server")
-				self._connect_to_wqm()
+			while not self._get_DCP_completed():
 
-			else:
+				if self._get_state() == 0:
+					
+					print("Not connected to server")
+					self._connect_to_wqm()
 
-				print("Currently connected server")
-				if self._get_state() == 4:
+				else:
 
-					print("Giving time for buffer to store all water quality data")
-					time.sleep(2)
+					print("Currently connected server")
+					if self._get_state() == 4:
 
-				self._read_message_from_wqm()
-				self._send_message_to_wqm()
+						print("Giving time for buffer to store all water quality data")
+						time.sleep(2)
+
+					self._read_message_from_wqm()
+					self._send_message_to_wqm()
+
+		except (KeyboardInterrupt, RuntimeError) as error:
+
+			print(error)
+			os.system("sudo killall pigpiod")
+
+if __name__ == "__main__":
+
+	airboat_wqm = WQM()
+
+	try:
+
+		airboat_wqm.motor_control_thread.start()
+
+		while True:
+
+			print("MAIN EXECUTING")
+			time.sleep(1)
+
+	except (KeyboardInterrupt, RuntimeError) as error:
+
+		print(error)
+		os.system("sudo killall pigpiod")
