@@ -438,6 +438,7 @@ void liquid_level_task(void* pvParameters) {
 			printf("Time passed: %0.2f\n", elapsedTime);
 			submerged = false;
 			DC_performed = true;
+			setState();
 		}
 		vTaskDelay(pdMS_TO_TICKS(100));
 	}
