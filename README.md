@@ -1,5 +1,7 @@
 # Autonomous-Water-Quality-Monitoring-Airboat
 
+![alt text](blob/boat.jpg?raw=true)
+
 Capstone engineering project by Michael Stinson, Ikponmwosa Evbayiro, Daniel Lamonte, Chimaobi Omeh, and Fredy Orellana.
 
 The purpose of this project is to enhance water pollution monitoring through real-time analysis. It aims to enable remote testing in shallow bodies of water using an autonomous device capable of navigating through a route determined by the user to conduct water quality measurements and determine meaningful trends and patterns from the data.
