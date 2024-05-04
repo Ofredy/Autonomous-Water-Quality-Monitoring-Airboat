@@ -1,6 +1,6 @@
 # Autonomous-Water-Quality-Monitoring-Airboat
 
-![alt text](blob/boat.jpg?raw=true)
+![alt text](misc/boat.jpg?raw=true)
 
 Capstone engineering project by Michael Stinson, Ikponmwosa Evbayiro, Daniel Lamonte, Chimaobi Omeh, and Fredy Orellana.
 
